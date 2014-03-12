@@ -90,15 +90,22 @@ class LIFFixedPool(NeuronPool):
     neuron_type = [LIF, Spiking, Fixed]
 
     def make(self, n_neurons):
-        self.voltage = np.zeros(n_neurons, dtype='i64')
-        self.refractory_time = np.zeros(n_neurons, dtype='u4')
+        self.voltage = np.zeros(n_neurons, dtype='i32')
+        self.refractory_time = np.zeros(n_neurons, dtype='u8')
 
-        self.one_over_tau_rc = int(0x10000 / self.tau_rc)
+        self.dt = None
+        self.ref_steps = None
+        self.lfsr = 1
 
     def step(self, dt, J):
-        J = np.asarray(J * dt * 0x10000, dtype='i64')
+        if self.dt != dt:
+            self.dt = dt
+            self.dt_over_tau_rc = int(dt * 0x10000 / self.tau_rc)
+            self.ref_steps = int(self.tau_ref / dt)
 
-        dv = ((J - self.voltage) * self.one_over_tau_rc ) >> 16
+        J = np.asarray(J * 0x10000, dtype='i32')
+
+        dv = ((J - self.voltage) * self.dt_over_tau_rc) >> 16
 
         dv[self.refractory_time > 0] = 0
 
@@ -110,7 +117,14 @@ class LIFFixedPool(NeuronPool):
 
         spiked = self.voltage > 0x10000
 
-        self.refractory_time[spiked > 0] = int(self.tau_rc / dt)
+        self.refractory_time[spiked > 0] = self.ref_steps
+
+        # randomly adjust the refractory period to account for overshoot
+        for i in np.where(spiked > 0)[0]:
+            p = ((self.voltage[i] - 0x10000) << 16) / dv[i]
+            if self.lfsr < p:
+                self.refractory_time[i] -= 1
+            self.lfsr = (self.lfsr >> 1) ^ (-(self.lfsr & 0x1) & 0xB400)
 
         self.voltage[spiked > 0] = 0
 
@@ -184,7 +198,7 @@ if __name__ == '__main__':
     #iz = create(100, [Izhikevich(a=0.02, b=0.2, c=-50, d=2)])
 
 
-    J = np.linspace(0, 10, 100)
+    J = np.linspace(-2, 10, 100)
     dt = 0.001
     T = 1
     spiking_data = []
@@ -197,7 +211,7 @@ if __name__ == '__main__':
         rate_data.append(rate.step(dt, J))
         iz_data.append(iz.step(dt, J))
         fixed_data.append(fixed.step(dt, J))
-        v.append(iz.v[-1])
+        v.append(fixed.voltage[-1])
 
     rate_tuning = np.sum(rate_data, axis=0)/T
     spiking_tuning = np.sum(spiking_data, axis=0)/T
@@ -205,13 +219,14 @@ if __name__ == '__main__':
     fixed_tuning = np.sum(fixed_data, axis=0)/T
 
     import pylab
-    #pylab.subplot(2, 1, 1)
+    pylab.subplot(2, 1, 1)
     pylab.plot(J, rate_tuning)
     pylab.plot(J, spiking_tuning)
     pylab.plot(J, iz_tuning)
-    pylab.plot(J, fixed_tuning)
-    #pylab.subplot(2, 1, 2)
-    #pylab.plot(v)
+    pylab.plot(J, fixed_tuning, linewidth=4)
+    pylab.subplot(2, 1, 2)
+    pylab.plot(v)
+    #pylab.plot(np.array(fixed_data)[:,-1])
     pylab.show()
 
 
