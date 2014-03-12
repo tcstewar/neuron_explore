@@ -94,7 +94,6 @@ class LIFFixedPool(NeuronPool):
         self.refractory_time = np.zeros(n_neurons, dtype='u8')
 
         self.dt = None
-        self.ref_steps = None
         self.lfsr = 1
 
     def step(self, dt, J):
