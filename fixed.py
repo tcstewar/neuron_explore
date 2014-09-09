@@ -21,7 +21,10 @@ class LIFFixedRefractoryPool(Pool):
         self.tau_rc = tau_rc
         self.tau_ref = tau_ref
         self.dt = dt
-        self.dt_over_tau_rc = int(dt * 0x10000 / tau_rc)
+        self.rc_shift = 0
+        while (1 << self.rc_shift) * dt < tau_rc:
+            self.rc_shift += 1
+        # print 'using effective tau_rc of', dt * (1 << self.rc_shift)
         self.ref_steps = int(tau_ref / dt)
         self.lfsr = 1
 
@@ -29,7 +32,7 @@ class LIFFixedRefractoryPool(Pool):
 
     def step(self, J):
         J = np.asarray(J * 0x10000, dtype='i32')
-        dv = ((J - self.voltage) * self.dt_over_tau_rc) >> 16
+        dv = (J - self.voltage) >> self.rc_shift
         dv[self.refractory_time > 0] = 0
         self.refractory_time[self.refractory_time > 0] -= 1
         self.voltage += dv
@@ -55,7 +58,11 @@ class LIFFixedQuickRefractoryPool(Pool):
         self.tau_rc = tau_rc
         self.tau_ref = tau_ref
         self.dt = dt
-        self.dt_over_tau_rc = int(dt * 0x10000 / tau_rc)
+
+        self.rc_shift = 0
+        while (1 << self.rc_shift) * dt < tau_rc:
+            self.rc_shift += 1
+        # print 'using effective tau_rc of', dt * (1 << self.rc_shift)
         self.ref_steps = int(tau_ref / dt)
         self.n_neurons = n_neurons
 
@@ -65,7 +72,7 @@ class LIFFixedQuickRefractoryPool(Pool):
 
     def step(self, J):
         J = np.asarray(J * 0x10000, dtype='i32')
-        dv = ((J - self.voltage) * self.dt_over_tau_rc) >> 16
+        dv = (J - self.voltage) >> self.rc_shift
         dv[self.refractory_time > 0] = 0
         self.refractory_time[self.refractory_time > 0] -= 1
         self.voltage += dv
@@ -79,12 +86,16 @@ class LIFFixedQuickRefractoryPool(Pool):
         self.limit_bits()
         return spiked
 
+
 class LIFFixedPool(Pool):
     def __init__(self, n_neurons, bits=16, dt=0.001, tau_rc=0.02):
         Pool.__init__(self, n_neurons, bits)
         self.tau_rc = tau_rc
         self.dt = dt
-        self.dt_over_tau_rc = int(dt * 0x10000 / tau_rc)
+        self.rc_shift = 0
+        while (1 << self.rc_shift) * dt < tau_rc:
+            self.rc_shift += 1
+        # print 'using effective tau_rc of', dt * (1 << self.rc_shift)
         self.n_neurons = n_neurons
 
         self.voltage = np.zeros(n_neurons, dtype='i32')
@@ -92,7 +103,7 @@ class LIFFixedPool(Pool):
 
     def step(self, J):
         J = np.asarray(J * 0x10000, dtype='i32')
-        dv = ((J - self.voltage) * self.dt_over_tau_rc) >> 16
+        dv = (J - self.voltage) >> self.rc_shift
         self.voltage += dv
         self.voltage[self.voltage < 0] = 0
         spiked = self.voltage > 0x10000
@@ -119,7 +130,7 @@ if __name__ == '__main__':
                LIFFixedQuickRefractoryPool]
 
     for i, cls in enumerate(classes):
-        pool = cls(n_neurons=100, bits=6)
+        pool = cls(n_neurons=100, bits=6, tau_rc=0.016)
         J, tuning = compute_tuning_curve(pool)
 
         pylab.subplot(len(classes), 1, i + 1)
