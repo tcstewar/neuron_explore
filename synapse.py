@@ -8,16 +8,17 @@ class Synapse(object):
         raise NotImplementedError()
 
     def fixed_rate_response(self, rate, weight=1.0, T=1.0):
+        if self.n_synapses == 1:
+            rates = np.array([rate])
+        else:
+            rates = np.linspace(0, rate, self.n_synapses)
         result = []
-        spike_count = 0
+        spike_count = np.zeros(self.n_synapses, dtype='uint32')
         for i in range(int(T/self.dt)):
-            if spike_count < rate * i * self.dt:
-                spike_count += 1
-                input = weight
-            else:
-                input = 0
-            result.append(list(self.step(input)))
-        return result, np.mean(result[len(result)/2:])
+            input = np.where(spike_count < rates * i * self.dt, 1, 0)
+            spike_count += input
+            result.append(self.step(input*weight).copy())
+        return result, np.mean(result[len(result)/2:], axis=0)
 
 class ExpStandard(Synapse):
     def __init__(self, n_synapses, dt=0.001, tau=0.016):
@@ -61,16 +62,25 @@ class ExpFixed(Synapse):
 if __name__ == '__main__':
     import pylab
     tau = 0.016
-    rate = 300
+    rate = 1000
     weight = 8.0
-    syn = ExpStandard(n_synapses=1, tau=tau)
+    bits = 14
+    syn = ExpStandard(n_synapses=50, tau=tau)
     response, avg = syn.fixed_rate_response(rate, weight=weight)
-    pylab.plot(response,label='std: %1.3f' % avg)
+    pylab.figure(1)
+    pylab.plot(np.array(response)[:,-1],label='std: %1.3f' % avg[-1])
+    pylab.figure(2)
+    pylab.plot(avg, label='std')
 
-    syn = ExpFixed(n_synapses=1, tau=tau, bits=10)
+    syn = ExpFixed(n_synapses=50, tau=tau, bits=bits)
     response, avg = syn.fixed_rate_response(rate, weight=weight)
-    pylab.plot(response,label='fixed: %1.3f' % avg)
-
+    pylab.figure(1)
+    pylab.plot(np.array(response)[:,-1],label='fixed: %1.3f' % avg[-1])
     pylab.legend()
+    pylab.figure(2)
+    pylab.plot(avg, label='fixed')
+    pylab.legend()
+
+
     pylab.show()
 
