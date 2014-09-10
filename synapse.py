@@ -73,31 +73,4 @@ if __name__ == '__main__':
 
     pylab.legend()
     pylab.show()
-    1/0
-
-
-
-
-    bits = 16
-    tau = 0.128
-    syn1 = SynapseStandard(1, tau=tau, bits=bits)
-    syn2 = SynapseQuick(1, tau=tau, bits=bits)
-    T = 5 * tau
-    steps = int(T/syn1.dt)
-    input = np.zeros(steps, dtype='i32')
-    input[int(10*tau/0.008)] = 1
-    input[int(15*tau/0.008)] = 1
-    output2 = np.zeros(steps, dtype='i32')
-    output1 = np.zeros(steps, dtype='i32')
-
-    for i in range(len(input)):
-        output1[i] = syn1.step(input[i])
-        output2[i] = syn2.step(input[i])
-
-    import pylab
-    pylab.plot(output1, label='sum=%d' % sum(output1))
-    pylab.plot(output2, label='sum=%d' % sum(output2))
-    pylab.legend()
-    pylab.show()
-
 
