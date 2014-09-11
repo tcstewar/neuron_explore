@@ -40,9 +40,9 @@ class ExpFixed(Synapse):
 
         self.bits = bits
         if bits == 20:
-            self.current_bit_mask = 0xFFFFF
+            self.current_bit_mask = 0xFFFFFFFF
         else:
-            self.current_bit_mask = 0xFFFFF - ((1 << (20-bits))-1)
+            self.current_bit_mask = 0xFFFFFFFF - ((1 << (20-bits))-1)
 
     def step(self, spikes):
         J = np.asarray((spikes * 0x10000), dtype='i32') >> self.decay_shift
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     import pylab
     tau = 0.016
     rate = 1000
-    weight = 8.0
+    weight = -8.0
     bits = 14
     syn = ExpStandard(n_synapses=50, tau=tau)
     response, avg = syn.fixed_rate_response(rate, weight=weight)

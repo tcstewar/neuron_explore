@@ -18,6 +18,7 @@ class Config(nengo.config.Config):
         self.configures(nengo.Ensemble)
         self[nengo.Ensemble].set_param('fixed', nengo.params.Parameter(False))
         self[nengo.Ensemble].set_param('fixed_bits_soma', nengo.params.Parameter(6))
+        self[nengo.Ensemble].set_param('fixed_bits_syn', nengo.params.Parameter(14))
 
 class Model(object):
     def __init__(self, dt=0.001):
@@ -75,7 +76,8 @@ class Simulator(object):
 
         if self.config[ens].fixed:
             p = pool.FixedPool(ens.n_neurons,
-                               bits_soma=self.config[ens].fixed_bits_soma)
+                               bits_soma=self.config[ens].fixed_bits_soma,
+                               bits_syn=self.config[ens].fixed_bits_syn)
         else:
             p = pool.StdPool(ens.n_neurons)
         intercepts = nengo.builder.sample(ens.intercepts, ens.n_neurons,
@@ -111,7 +113,7 @@ class Simulator(object):
             for i in range(int(T/self.dt)):
                 spikes = self.poisson_spikes(J / (p.weight_syn * self.dt))
                 data += p.step(spikes)
-                #data += p.soma.step(J)
+                #data += p.step(J / p.weight_syn)
             A.append(data / T)
         return x, A
 
@@ -142,17 +144,19 @@ if __name__ == '__main__':
     model = nengo.Network()
     model.config[nengo.Ensemble].max_rates=Uniform(100, 200)
     with model:
-        a = nengo.Ensemble(n_neurons=50, dimensions=1)
+        a = nengo.Ensemble(n_neurons=100, dimensions=1)
         config[a].fixed = True
         config[a].fixed_bits_soma = 6
+        config[a].fixed_bits_syn = 10
 
     sim = Simulator(model, seed=1, config=config)
     sim.run(1)
 
     import pylab
     pylab.figure()
-    X, A = sim.compute_tuning_curves(a)
+    X, A = sim.compute_tuning_curves(a, T=10)
     pylab.plot(X, A)
+    pylab.savefig('tuning_curves.png')
     pylab.show()
 
 
