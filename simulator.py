@@ -35,6 +35,8 @@ class Simulator(object):
 
         for ens in model.all_ensembles:
             self.make_pool(ens)
+        for conn in model.all_connections:
+            self.make_connection(conn)
 
     def find_gain_bias(self, soma, intercepts, max_rates):
         # find gains and biases for given intercepts and max_rates given
@@ -100,6 +102,13 @@ class Simulator(object):
                                                eval_points=None,
                                                )
 
+    def make_connection(self, conn):
+        if isinstance(conn.pre_obj, nengo.Ensemble):
+            decoder = self.compute_decoder(conn.pre_obj, conn.function)
+
+    def compute_decoder(self, ens, function):
+        pass
+
 
     def compute_tuning_curves(self, ens, T=1):
         assert ens.dimensions == 1
@@ -141,13 +150,20 @@ class Simulator(object):
 
 if __name__ == '__main__':
     config = Config()
+    D = 1
     model = nengo.Network()
     model.config[nengo.Ensemble].max_rates=Uniform(100, 200)
     with model:
-        a = nengo.Ensemble(n_neurons=100, dimensions=1)
+        a = nengo.Ensemble(n_neurons=100, dimensions=D)
         config[a].fixed = True
         config[a].fixed_bits_soma = 6
         config[a].fixed_bits_syn = 10
+
+        def print_it(t, x):
+            print x
+        output = nengo.Node(print_it, size_in=D)
+
+        nengo.Connection(a, output)
 
     sim = Simulator(model, seed=1, config=config)
     sim.run(1)
