@@ -17,6 +17,7 @@ class Config(nengo.config.Config):
         super(Config, self).__init__()
         self.configures(nengo.Ensemble)
         self[nengo.Ensemble].set_param('fixed', nengo.params.Parameter(False))
+        self[nengo.Ensemble].set_param('compact', nengo.params.Parameter(False))
         self[nengo.Ensemble].set_param('fixed_bits_soma', nengo.params.Parameter(6))
         self[nengo.Ensemble].set_param('fixed_bits_syn', nengo.params.Parameter(14))
 
@@ -76,7 +77,9 @@ class Simulator(object):
             encoders /= npext.norm(encoders, axis=1, keepdims=True)
 
 
-        if self.config[ens].fixed:
+        if self.config[ens].compact:
+            p = pool.CompactPool(ens.n_neurons)
+        elif self.config[ens].fixed:
             p = pool.FixedPool(ens.n_neurons,
                                bits_soma=self.config[ens].fixed_bits_soma,
                                bits_syn=self.config[ens].fixed_bits_syn)
@@ -117,7 +120,7 @@ class Simulator(object):
         x = np.linspace(-1, 1, 50)
         for xx in x:
             J = np.dot([xx], self.model.params[ens].scaled_encoders.T)# + p.bias
-            print xx, J[0], p.bias[0]
+            print xx, J[0]
             data = np.zeros(ens.n_neurons)
             for i in range(int(T/self.dt)):
                 spikes = self.poisson_spikes(J / (p.weight_syn * self.dt))
@@ -132,7 +135,7 @@ class Simulator(object):
         rate[rate<=0.00001] = 0.00001
 
         time = np.zeros(rate.shape)
-        spikes = np.zeros(rate.shape)
+        spikes = np.zeros(rate.shape, dtype='i32')
         time = -np.log(self.rng.rand(*rate.shape)) / rate
         index = np.where(time < self.dt)
         spikes[index] += sign[index]
@@ -154,8 +157,8 @@ if __name__ == '__main__':
     model = nengo.Network()
     model.config[nengo.Ensemble].max_rates=Uniform(100, 200)
     with model:
-        a = nengo.Ensemble(n_neurons=100, dimensions=D)
-        config[a].fixed = True
+        a = nengo.Ensemble(n_neurons=40, dimensions=D)
+        config[a].compact = True
         config[a].fixed_bits_soma = 6
         config[a].fixed_bits_syn = 10
 
@@ -170,7 +173,7 @@ if __name__ == '__main__':
 
     import pylab
     pylab.figure()
-    X, A = sim.compute_tuning_curves(a, T=10)
+    X, A = sim.compute_tuning_curves(a, T=0.5)
     pylab.plot(X, A)
     pylab.savefig('tuning_curves.png')
     pylab.show()
