@@ -91,6 +91,7 @@ class Simulator(object):
                                           rng=self.rng)
         gain, bias = self.find_gain_bias(p.soma, intercepts, max_rates)
         p.set_bias(bias)
+        print 'bias', p.get_bias()
 
         scaled_encoders = encoders * (gain / ens.radius)[:, np.newaxis]
 
@@ -159,8 +160,9 @@ if __name__ == '__main__':
     with model:
         a = nengo.Ensemble(n_neurons=40, dimensions=D)
         config[a].compact = True
+        #config[a].fixed = True
         config[a].fixed_bits_soma = 6
-        config[a].fixed_bits_syn = 10
+        config[a].fixed_bits_syn = 15
 
         def print_it(t, x):
             print x
@@ -174,7 +176,10 @@ if __name__ == '__main__':
     import pylab
     pylab.figure()
     X, A = sim.compute_tuning_curves(a, T=0.5)
-    pylab.plot(X, A)
+    index = [10, 13, 16]
+    X = np.array(X)
+    A = np.array(A)
+    pylab.plot(X, A)#[:,index])
     pylab.savefig('tuning_curves.png')
     pylab.show()
 

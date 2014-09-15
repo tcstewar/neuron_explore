@@ -53,6 +53,9 @@ class ExpFixed(Synapse):
         self.current[decay==0] = 0
         self.current += J
 
+        self.current[self.current < -0x100000] = -0x100000
+        self.current[self.current > 0xFFFFF] = 0xFFFFF
+
         self.current &= self.current_bit_mask
 
         return self.current.astype('float') / 0x10000
