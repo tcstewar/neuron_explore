@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     import pylab
     pylab.figure()
-    X, A = sim.compute_tuning_curves(a, T=0.5)
+    X, A = sim.compute_tuning_curves(a, T=10)
     index = [10, 13, 16]
     X = np.array(X)
     A = np.array(A)

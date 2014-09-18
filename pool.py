@@ -44,12 +44,12 @@ class FixedPool(Pool):
         self.syn = synapse.ExpFixed(n_neurons, dt=dt, tau=tau_syn, bits=bits_syn)
         self.weight_syn = weight_syn
     def set_bias(self, bias):
-        self.bias = bias
+        self.bias = (bias * 2).astype('i32')
     def get_bias(self):
-        return self.bias
+        return self.bias.astype(float) / 2
     def step(self, spikes):
         J = self.syn.step(spikes.astype(float) * self.weight_syn)
-        s = self.soma.step(J + self.bias)
+        s = self.soma.step(J + self.get_bias())
         return s
     def get_voltage(self):
         return self.soma.voltage.astype(float) / 0x10000
@@ -66,8 +66,8 @@ class CompactPool(Pool):
         self.state = np.zeros(n_neurons, dtype='uint32')
         # bits  5- 0: voltage
         # bits  7- 6: refractory
-        # bits 13- 8: bias
-        # bits 29-14: current
+        # bits 15- 8: bias
+        # bits 31-16: current
 
         decay_shift = 0
         while (1 << decay_shift) * dt < tau_syn:
@@ -79,15 +79,14 @@ class CompactPool(Pool):
                                          tau_ref=0.002, bits=6)
 
     def set_bias(self, bias):
-        rc_shift = 4
-        bias = (bias * 0x10000).astype('i32') >> (rc_shift + 2)
-        bias = bias & 0x0000FC00
-        self.state |= bias
+        bias = (bias * 2).astype('i32')
+        bias = bias & 0x000000FF
+        self.state |= bias << 8
 
     def get_bias(self):
-        bias = ((self.state >> 8) & 0x000003F).astype('i32')
-        bias[bias > 0x1F] -= 0x40  # handle sign on current
-        return bias.astype(float)
+        bias = ((self.state >> 8) & 0x00000FF).astype('i32')
+        bias[bias > 0x7F] -= 0x100  # handle sign on current
+        return bias.astype(float) /2.0
 
 
     def get_voltage(self):
@@ -95,7 +94,7 @@ class CompactPool(Pool):
         return voltage.astype(float) / 0x40
 
     def get_syn_current(self):
-        current = ((self.state >> 14) & 0xFFFF).astype('i32')
+        current = ((self.state >> 16) & 0xFFFF).astype('i32')
         current[current > 0x7FFF] -= 0x10000  # handle sign on current
         return current.astype(float) / (1 << 11)
 
@@ -103,9 +102,9 @@ class CompactPool(Pool):
         # extract data out of the state
         voltage = (self.state & 0x0000003F).astype('i32')
         refractory = (self.state >> 6) & 0x0000003
-        bias = ((self.state >> 8) & 0x000003F).astype('i32')
-        bias[bias > 0x1F] -= 0x40  # handle sign on current
-        current = ((self.state >> 14) & 0xFFFF).astype('i32')
+        bias = ((self.state >> 8) & 0x00000FF).astype('i32')
+        bias[bias > 0x7F] -= 0x100  # handle sign on current
+        current = ((self.state >> 16) & 0xFFFF).astype('i32')
         current[current > 0x7FFF] -= 0x10000  # handle sign on current
 
         current = current << 5
@@ -122,10 +121,11 @@ class CompactPool(Pool):
         current[current < -0x8000] = -0x8000
         current[current > 0x7FFF] = 0x7FFF
 
-        current += bias << 5
+
+        total_current = current + (bias << 10)
         # soma update
         rc_shift = 4
-        dv = (((current >> 5) - voltage) >> rc_shift)
+        dv = (((total_current >> 5) - voltage) >> rc_shift)
 
         # no voltage change during refractory period
         dv[refractory > 0] = 0
@@ -141,11 +141,25 @@ class CompactPool(Pool):
         voltage[spiked > 0] -= 0x40
         #voltage[voltage >= 0x40] = 0x3F
         # make sure we're not driving it so hard it spikes twice
-        assert np.sum(voltage >= 0x40) == 0
+        #print voltage >= 0x40
+        index = voltage >= 0x40
+        '''
+        print index
+        print self.get_syn_current()[index]
+        print current[index]
+        print total_current[index]
+        print dv[index]
+        print self.get_voltage()[index]
+        print voltage[index]
+        print bias[index]
+        print spikes[index]
+        '''
+        #assert np.sum(voltage >= 0x40) == 0
+        voltage[voltage >= 0x40] == 0x3F
 
         # put data back into state
-        self.state &= 0x00003F00
-        self.state |= (current << 14) & 0x3FFFC000
+        self.state &= 0x0000FF00
+        self.state |= (current << 16)# & 0xFFFF000
         self.state |= (refractory << 6)
         self.state |= voltage
 

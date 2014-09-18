@@ -8,7 +8,11 @@ sim = simulator.Simulator(nengo.Network(), seed=2)
 
 pools = [pool.CompactPool(5), pool.FixedPool(5, bits_syn=15)]
 
-rate = np.random.uniform(-2000, 2000, size=5)
+for pool in pools:
+    pool.set_bias(np.array([-20, -1, 0, 1, 20]))
+    print pool.get_bias()
+
+rate = np.random.uniform(-1000, 1000, size=5)
 for i in range(500):
     spikes = sim.poisson_spikes(rate)
 

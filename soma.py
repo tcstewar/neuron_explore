@@ -168,6 +168,8 @@ class LIFFixedMinimal(Soma):
         # assume that the current at the end of the refractory period is the
         #  same as at the start
         self.voltage[spiked > 0] -= 0x10000
+        #assert np.sum(self.voltage >= 0x10000) == 0
+        self.voltage[self.voltage >= 0x10000] = 0xFFFF
         self.voltage &= self.voltage_bit_mask   # limit # of bits stored
         return spiked
 
