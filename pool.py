@@ -20,7 +20,11 @@ class StdPool(Pool):
         self.syn = synapse.ExpStandard(n_neurons, dt=dt, tau=tau_syn)
         self.weight_syn = weight_syn
     def set_bias(self, bias):
+        #bias = (bias * 2).astype('i32')
+        #bias = bias.astype(float) / 2
         self.bias = bias
+    def get_bias(self):
+        return self.bias
     def step(self, spikes):
         J = self.syn.step(spikes.astype(float) * self.weight_syn)
         return self.soma.step(J + self.bias)
