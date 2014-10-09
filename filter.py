@@ -10,12 +10,12 @@ class DecayFilter:
 
 class ScaleFilter:
     def __init__(self, tau, dt):
-        self.tau = dt / tau
+        self.dt_over_tau = dt / tau
         self.state = 0
     def step(self, value):
         # note that, in fixed point, if tau/dt is a power of 2, these
         # multiplications can all be done as shifts
-        self.state = self.state - self.state * self.tau + value * self.tau
+        self.state = self.state + (value - self.state) * self.dt_over_tau
         return self.state
 
 T = 1.0          # time to simulate for (s)
